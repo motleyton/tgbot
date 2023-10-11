@@ -14,15 +14,8 @@ class ChatGPTTelegramBot:
 
     async def start(self, update: Update, context: CallbackContext) -> None:
         context.user_data['state'] = 'waiting_for_name'
-        await update.message.reply_text("Привет! Как тебя зовут?")
+        await update.message.reply_text("Пожалуйста, ответьте на вопросы.\nКак Вас зовут?")
 
-    async def send_menu(self, update: Update, context: CallbackContext) -> None:
-        keyboard = [
-            ["/start", "/help"],
-        ]
-
-        markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        await update.message.reply_text("Выберите команду:", reply_markup=markup)
 
     async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         """
@@ -39,25 +32,39 @@ class ChatGPTTelegramBot:
         await update.message.reply_text(help_text, disable_web_page_preview=True)
 
     async def message_handler(self, update: Update, context: CallbackContext) -> None:
-        state = context.user_data.get('state', '')
+        state = context.user_data.get('state', 'start')
+
+        # Инициализация истории сообщений
+        if 'messages' not in context.user_data:
+            context.user_data['messages'] = []
+
+        # Добавление сообщения пользователя в историю
+        user_message_content = f"Ученик: {update.message.text}"
+        context.user_data['messages'].append({"role": "user", "content": user_message_content})
 
         if state == 'waiting_for_name':
             context.user_data['name'] = update.message.text
-            await update.message.reply_text(f"Привет, {context.user_data['name']}! Сколько тебе лет?")
+            await update.message.reply_text("Сколько Вам лет?")
             context.user_data['state'] = 'waiting_for_age'
 
         elif state == 'waiting_for_age':
             context.user_data['age'] = update.message.text
-            await update.message.reply_text(f"Отлично, {context.user_data['name']}! Есть ли у тебя какие-то увлечения?")
+            await update.message.reply_text(f"Отлично. Есть ли у тебя какие-то увлечения?")
             context.user_data['state'] = 'waiting_for_interests'
 
         elif state == 'waiting_for_interests':
             context.user_data['interests'] = update.message.text
-            await update.message.reply_text(f"Здорово! Я запомнил. Теперь можем общаться.")
+            await update.message.reply_text(f"Привет! Меня зовут Маша 👋 \nНапиши сюда свое задание и своими словами вопрос, который тебе не понятен. \nЯ попробую помочь 😃")
             context.user_data['state'] = 'chatting'
 
         elif state == 'chatting':
-            response = self.openai.get_response(context.user_data, update.message.text)
+
+            response = self.openai.get_response(context.user_data['messages'])
+
+            # Добавление ответа учителя в историю
+
+            context.user_data['messages'].append({"role": "assistant", "content": response})
+
             await update.message.reply_text(response)
 
     def run(self):
@@ -72,7 +79,7 @@ class ChatGPTTelegramBot:
             .concurrent_updates(True) \
             .build()
 
-        application.add_handler(CommandHandler('start', self.send_menu))
+        application.add_handler(CommandHandler('start', self.start))
         application.add_handler(CommandHandler('help', self.help))
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), self.message_handler))
         application.add_error_handler(error_handler)
