@@ -1,42 +1,77 @@
-from telegram import BotCommandScopeAllGroupChats, Update, constants, ReplyKeyboardMarkup
+from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, \
-    filters, InlineQueryHandler, CallbackQueryHandler, Application, ContextTypes, CallbackContext, Updater
+    filters, ContextTypes, CallbackContext
+
+from database_helper import Database
 from utils import error_handler
 from openai_helper import localized_text, OpenAI
-from telegram import ReplyKeyboardMarkup
-
 
 class ChatGPTTelegramBot:
 
     def __init__(self, config: dict, openai: OpenAI):
         self.config = config
         self.openai = openai
+        self.allowed_users = config['allowed_user_ids']
+        self.max_requests_per_day = config['max_requests_per_day']
+        self.forbidden_keywords = config['forbidden_keywords']
+        self.db = Database("users_data.db")
+
 
     async def start(self, update: Update, context: CallbackContext) -> None:
+        user_id = update.message.from_user.id
+        bot_language = self.config['bot_language']
+        disallowed = (
+                localized_text('disallowed', bot_language))
+        if user_id not in self.allowed_users:
+            await update.message.reply_text(disallowed, disable_web_page_preview=True)
+            return
+
+        user_data = self.db.get_user(user_id)
+        if user_data:
+            context.user_data[
+                'state'] = 'chatting'  # Устанавливаем состояние 'chatting' для зарегистрированных пользователей
+            await update.message.reply_text(f"Привет, {user_data['name']}! 👋. Что ты хочешь спросить у Маши?")
+            return
+        # Если пользователь не найден в базе данных, начинаем процесс регистрации
         context.user_data['state'] = 'waiting_for_name'
         await update.message.reply_text("Пожалуйста, ответьте на вопросы.\nКак Вас зовут?")
 
-
     async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
-        """
-        Shows the help menu.
-        """
         user_id = update.message.from_user.id
-
         bot_language = self.config['bot_language']
+        disallowed = (
+            localized_text('disallowed', bot_language))
+        if user_id not in self.allowed_users:
+            await update.message.reply_text(disallowed, disable_web_page_preview=True)
+            return
+
         help_text = (
-                localized_text('help_text', bot_language)[0] +
-                '\n\n' +
-                f"Personal ID: {user_id}"
+            localized_text('help_text', bot_language)[0] +
+            '\n\n' +
+            f"Personal ID: {user_id}"
         )
         await update.message.reply_text(help_text, disable_web_page_preview=True)
 
     async def message_handler(self, update: Update, context: CallbackContext) -> None:
+        user_id = update.message.from_user.id
+
+        # if any(keyword in update.message.text for keyword in self.forbidden_keywords):
+        #     await update.message.reply_text("Извините, я не могу ответить на этот вопрос.")
+        #     return
+
+        if self.db.get_message_count_today(user_id) >= self.max_requests_per_day:
+            await update.message.reply_text("Вы достигли лимита запросов на сегодня.")
+            return
+
         state = context.user_data.get('state', 'start')
+
+        # Запись сообщения пользователя
+        self.db.add_message(user_id, 'user', update.message.text)
 
         # Инициализация истории сообщений
         if 'messages' not in context.user_data:
-            context.user_data['messages'] = []
+            context.user_data['messages'] = self.db.get_message_history(user_id)
+
 
         # Добавление сообщения пользователя в историю
         user_message_content = f"Ученик: {update.message.text}"
@@ -44,26 +79,34 @@ class ChatGPTTelegramBot:
 
         if state == 'waiting_for_name':
             context.user_data['name'] = update.message.text
-            await update.message.reply_text("Сколько Вам лет?")
+            self.db.add_or_update_user(user_id, name=update.message.text)
+            await update.message.reply_text("Сколько тебе лет?")
             context.user_data['state'] = 'waiting_for_age'
 
         elif state == 'waiting_for_age':
             context.user_data['age'] = update.message.text
+            self.db.add_or_update_user(user_id, age=update.message.text)
             await update.message.reply_text(f"Отлично. Есть ли у тебя какие-то увлечения?")
             context.user_data['state'] = 'waiting_for_interests'
 
         elif state == 'waiting_for_interests':
             context.user_data['interests'] = update.message.text
-            await update.message.reply_text(f"Привет! Меня зовут Маша 👋 \nНапиши сюда свое задание и своими словами вопрос, который тебе не понятен. \nЯ попробую помочь 😃")
+            self.db.add_or_update_user(user_id, interests=update.message.text)
+            await update.message.reply_text(
+                f"Привет! Меня зовут Маша 👋 \nНапиши сюда свое задание и своими словами вопрос, который тебе не понятен. \nЯ попробую помочь 😃")
             context.user_data['state'] = 'chatting'
 
         elif state == 'chatting':
 
-            response = self.openai.get_response(context.user_data['messages'])
+            user_id = update.message.from_user.id
+            user_data = self.db.get_user(user_id)
+            response = self.openai.get_response(user_data, update.message.text)
 
             # Добавление ответа учителя в историю
-
             context.user_data['messages'].append({"role": "assistant", "content": response})
+
+            # Запись ответа бота в базу данных
+            self.db.add_message(user_id, 'assistant', response)
 
             await update.message.reply_text(response)
 
