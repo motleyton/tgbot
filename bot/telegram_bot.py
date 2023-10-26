@@ -11,18 +11,18 @@ class ChatGPTTelegramBot:
     def __init__(self, config: dict, openai: OpenAI):
         self.config = config
         self.openai = openai
-        self.allowed_users = config['allowed_user_ids']
+        self.allowed_usernames = config['allowed_usernames']
         self.max_requests_per_day = config['max_requests_per_day']
-        self.forbidden_keywords = config['forbidden_keywords']
         self.db = Database("users_data.db")
 
 
     async def start(self, update: Update, context: CallbackContext) -> None:
         user_id = update.message.from_user.id
         bot_language = self.config['bot_language']
+        username = "@" + update.message.from_user.username if update.message.from_user.username else None
         disallowed = (
-                localized_text('disallowed', bot_language))
-        if user_id not in self.allowed_users:
+            localized_text('disallowed', bot_language))
+        if username not in self.allowed_usernames:
             await update.message.reply_text(disallowed, disable_web_page_preview=True)
             return
 
@@ -41,7 +41,7 @@ class ChatGPTTelegramBot:
         bot_language = self.config['bot_language']
         disallowed = (
             localized_text('disallowed', bot_language))
-        if user_id not in self.allowed_users:
+        if user_id not in self.allowed_usernames:
             await update.message.reply_text(disallowed, disable_web_page_preview=True)
             return
 
@@ -54,10 +54,6 @@ class ChatGPTTelegramBot:
 
     async def message_handler(self, update: Update, context: CallbackContext) -> None:
         user_id = update.message.from_user.id
-
-        # if any(keyword in update.message.text for keyword in self.forbidden_keywords):
-        #     await update.message.reply_text("Извините, я не могу ответить на этот вопрос.")
-        #     return
 
         if self.db.get_message_count_today(user_id) >= self.max_requests_per_day:
             await update.message.reply_text("Вы достигли лимита запросов на сегодня.")

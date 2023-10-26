@@ -55,9 +55,8 @@ def main():
     telegram_config = {
         'token': os.environ['TELEGRAM_BOT_TOKEN'],
         'admin_user_ids': os.environ.get('ADMIN_USER_IDS', '-'),
-        'allowed_user_ids': [int(user_id.strip()) for user_id in os.environ.get('ALLOWED_TELEGRAM_USER_IDS').split(',')],
+        'allowed_usernames': os.environ.get('ALLOWED_USERNAMES'),
         'max_requests_per_day': int(os.environ.get('MAX_REQUESTS_PER_DAY')),
-        'forbidden_keywords': [keyword.strip() for keyword in os.environ.get('FORBIDDEN_KEYWORDS').split(',')],
         'enable_quoting': os.environ.get('ENABLE_QUOTING', 'true').lower() == 'true',
         'enable_image_generation': os.environ.get('ENABLE_IMAGE_GENERATION', 'true').lower() == 'true',
         'enable_transcription': os.environ.get('ENABLE_TRANSCRIPTION', 'true').lower() == 'true',
