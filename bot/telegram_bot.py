@@ -1,3 +1,5 @@
+import datetime
+
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, \
     filters, ContextTypes, CallbackContext
@@ -34,7 +36,7 @@ class ChatGPTTelegramBot:
             return
         # Если пользователь не найден в базе данных, начинаем процесс регистрации
         context.user_data['state'] = 'waiting_for_name'
-        await update.message.reply_text("Пожалуйста, ответьте на вопросы.\nКак Вас зовут?")
+        await update.message.reply_text("Пожалуйста, ответь на вопросы.\nКак тебя зовут?")
 
     async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         user_id = update.message.from_user.id

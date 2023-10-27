@@ -25,7 +25,8 @@ class Database:
                 user_id INTEGER PRIMARY KEY,
                 name TEXT,
                 age INTEGER,
-                interests TEXT
+                interests TEXT,
+                last_request_time DATETIME
             )
         """)
         self.conn.commit()
@@ -75,5 +76,19 @@ class Database:
         else:
             return None
 
+    def update_last_request_time(self, user_id):
+        self.cursor.execute(
+            "UPDATE users SET last_request_time = CURRENT_TIMESTAMP WHERE user_id = ?",
+            (user_id,)
+        )
+        self.conn.commit()
+
+    def get_last_request_time(self, user_id):
+        self.cursor.execute(
+            "SELECT last_request_time FROM users WHERE user_id = ?",
+            (user_id,)
+        )
+        row = self.cursor.fetchone()
+        return row[0] if row else None
     def close(self):
         self.conn.close()

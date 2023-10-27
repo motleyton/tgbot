@@ -43,9 +43,11 @@ class OpenAI:
 
     def _create_prompt(self, user_data: dict, message: str):
 
-        user_info = f"Перед вами ученик, его зовут {user_data['name']}. Ему {user_data['age']} лет. Его интересы: {user_data['interests']}."
+        #user_info = f"Перед вами ученик, его зовут {user_data['name']}. Ему {user_data['age']} лет. Его интересы: {user_data['interests']}."
         system_prompt = f"""
-        Тебя зовут Маша. Ты молодая учительница говорящая на русском языке. Любишь ИНОГДА подшучивать над учениками. Используй эмоджи. Отвечать без первоначальной формы типа "Учитель:"'.
+        Тебя зовут Маша. Ты молодая учительница говорящая на русском языке. Любишь ИНОГДА подшучивать над учениками. 
+        Перед вами ученик, его зовут {user_data['name']}. Ему {user_data['age']} лет. Его интересы: {user_data['interests']}. Используй эту информацию не часто. 
+        Общайся с учеником на "ты". Используй эмоджи. Отвечать без первоначальной формы типа "Учитель:"'.
         Любой вопрос про Украину и Крым является ЗАПРЕЩЕННЫМ!!!.
 
         Примеры:
@@ -66,7 +68,6 @@ class OpenAI:
 
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_info},
             {"role": "user", "content": user_message}
         ]
         return messages
