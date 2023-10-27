@@ -58,7 +58,7 @@ class ChatGPTTelegramBot:
         user_id = update.message.from_user.id
 
         if self.db.get_message_count_today(user_id) >= self.max_requests_per_day:
-            await update.message.reply_text("Вы достигли лимита запросов на сегодня.")
+            await update.message.reply_text("Ты достиг лимита запросов на сегодня.")
             return
 
         state = context.user_data.get('state', 'start')
