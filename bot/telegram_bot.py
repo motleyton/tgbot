@@ -1,6 +1,6 @@
 import datetime
 
-from telegram import Update
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, \
     filters, ContextTypes, CallbackContext
 
@@ -28,29 +28,35 @@ class ChatGPTTelegramBot:
             await update.message.reply_text(disallowed, disable_web_page_preview=True)
             return
 
+        start_keyboard = [['/start', '/help']]
+        reply_markup = ReplyKeyboardMarkup(start_keyboard, one_time_keyboard=True, resize_keyboard=True)
+
+        # Отправка сообщения с клавиатурой
+        # await update.message.reply_text('Выберите команду:', reply_markup=reply_markup)
+
         user_data = self.db.get_user(user_id)
         if user_data:
             context.user_data[
                 'state'] = 'chatting'  # Устанавливаем состояние 'chatting' для зарегистрированных пользователей
-            await update.message.reply_text(f"Привет, {user_data['name']}! 👋. Что ты хочешь спросить у Маши?")
+            await update.message.reply_text(f"Привет, {user_data['name']}! 👋. Что ты хочешь спросить у Мии?", reply_markup=reply_markup)
             return
         # Если пользователь не найден в базе данных, начинаем процесс регистрации
         context.user_data['state'] = 'waiting_for_name'
-        await update.message.reply_text("Пожалуйста, ответь на вопросы.\nКак тебя зовут?")
+        await update.message.reply_text("Пожалуйста, ответь на вопросы.\nКак тебя зовут?", reply_markup=reply_markup)
+
 
     async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         user_id = update.message.from_user.id
+        username = "@" + update.message.from_user.username if update.message.from_user.username else None
         bot_language = self.config['bot_language']
         disallowed = (
             localized_text('disallowed', bot_language))
-        if user_id not in self.allowed_usernames:
+        if username not in self.allowed_usernames:
             await update.message.reply_text(disallowed, disable_web_page_preview=True)
             return
 
         help_text = (
-            localized_text('help_text', bot_language)[0] +
-            '\n\n' +
-            f"Personal ID: {user_id}"
+            localized_text('help_text', bot_language)[0]
         )
         await update.message.reply_text(help_text, disable_web_page_preview=True)
 
@@ -58,7 +64,7 @@ class ChatGPTTelegramBot:
         user_id = update.message.from_user.id
 
         if self.db.get_message_count_today(user_id) >= self.max_requests_per_day:
-            await update.message.reply_text("Ты достиг лимита запросов на сегодня.")
+            await update.message.reply_text("Достигнут лимит запросов. Приходи завтра.")
             return
 
         state = context.user_data.get('state', 'start')
@@ -84,15 +90,10 @@ class ChatGPTTelegramBot:
         elif state == 'waiting_for_age':
             context.user_data['age'] = update.message.text
             self.db.add_or_update_user(user_id, age=update.message.text)
-            await update.message.reply_text(f"Отлично. Есть ли у тебя какие-то увлечения?")
-            context.user_data['state'] = 'waiting_for_interests'
-
-        elif state == 'waiting_for_interests':
-            context.user_data['interests'] = update.message.text
-            self.db.add_or_update_user(user_id, interests=update.message.text)
             await update.message.reply_text(
-                f"Привет! Меня зовут Маша 👋 \nНапиши сюда свое задание и своими словами вопрос, который тебе не понятен. \nЯ попробую помочь 😃")
+                f"Привет! Меня зовут Мия 👋 \nНапиши сюда свое задание и своими словами вопрос, который тебе не понятен. \nЯ попробую помочь 😃")
             context.user_data['state'] = 'chatting'
+
 
         elif state == 'chatting':
 

@@ -25,7 +25,6 @@ class Database:
                 user_id INTEGER PRIMARY KEY,
                 name TEXT,
                 age INTEGER,
-                interests TEXT,
                 last_request_time DATETIME
             )
         """)
@@ -47,20 +46,19 @@ class Database:
             "SELECT COUNT(*) FROM messages WHERE user_id = ? AND DATE(timestamp) = DATE(CURRENT_TIMESTAMP)", (user_id,))
         return self.cursor.fetchone()[0]
 
-    def add_or_update_user(self, user_id, name=None, age=None, interests=None):
+    def add_or_update_user(self, user_id, name=None, age=None):
         self.cursor.execute("""
-            INSERT OR IGNORE INTO users (user_id, name, age, interests)
-            VALUES (?, ?, ?, ?)
-        """, (user_id, name, age, interests))
+            INSERT OR IGNORE INTO users (user_id, name, age)
+            VALUES (?, ?, ?)
+        """, (user_id, name, age))
 
-        if name or age or interests:
+        if name or age:
             self.cursor.execute("""
                 UPDATE users
                 SET name = COALESCE(?, name),
-                    age = COALESCE(?, age),
-                    interests = COALESCE(?, interests)
+                    age = COALESCE(?, age)
                 WHERE user_id = ?
-            """, (name, age, interests, user_id))
+            """, (name, age, user_id))
         self.conn.commit()
 
     def get_user(self, user_id):
@@ -71,7 +69,6 @@ class Database:
                 'user_id': row[0],
                 'name': row[1],
                 'age': row[2],
-                'interests': row[3]
             }
         else:
             return None
